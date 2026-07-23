@@ -21,8 +21,8 @@ class Aeroporto:
     def __init__(self, env):
         self.env = env
         # Capacidades definidas no problema
-        self.pistas_pequenas = simpy.Resource(env, capacity=4)
-        self.pista_grande = simpy.Resource(env, capacity=2)
+        self.pistas_pequenas = simpy.Resource(env, capacity=2)
+        self.pista_grande = simpy.Resource(env, capacity=1)
         self.plataformas = simpy.Resource(env, capacity=5)
         self.hangares = simpy.Resource(env, capacity=4)
 
@@ -143,7 +143,7 @@ if __name__ == '__main__':
     
     print("="*50 + f"\nTempo final da simulação: {env.now:.1f} minutos\n")
     
-    # (Bônus para análise de gargalos) Transforma o log num DataFrame
+    # Transforma o log num DataFrame
     df_metricas = pd.DataFrame(log_esperas)
     if not df_metricas.empty:
         print("MÉDIA DE TEMPO DE ESPERA POR FILA (em minutos):")
