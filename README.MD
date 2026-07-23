@@ -71,3 +71,4 @@ portanto, criamos os seguintes cenários para otimizar o fluxo
 
 ---
 
+extra: na pasta videos_simulação contém as simulações visuais dos 3 primeiros cenários
