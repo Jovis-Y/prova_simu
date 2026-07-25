@@ -1,56 +1,88 @@
-from src.topologia import estado_nos
+from typing import Any
+from contextlib import contextmanager
 
-def ciclo_aeronave_visual(env, id_aeronave, tipo, aeroporto):
-    # --- CHEGADA ---
-    estado_nos['Chegada'] += 1
-    yield env.timeout(1)
-    estado_nos['Chegada'] -= 1
+# Importação do dicionário global de topologia original
+from topologia import estado_nos
+
+# --- CONFIGURAÇÕES DO SISTEMA ---
+# A centralização dos tempos facilita testes e a inclusão de novas categorias (ex: M, Carga).
+TEMPOS_PROCESSO = {
+    'P': {'pouso': 40, 'desembarque': 20, 'hangar': 35, 'embarque': 30, 'decolagem': 40},
+    'G': {'pouso': 60, 'desembarque': 40, 'hangar': 70, 'embarque': 60, 'decolagem': 60}
+}
+
+@contextmanager
+def atualizar_estado(chave: str):
+    """
+    Gerenciador de contexto para atualizar o dicionário global de estados de forma segura.
+    Substitui a adição e subtração manual repetitiva.
+    """
+    estado_nos[chave] = estado_nos.get(chave, 0) + 1
+    try:
+        yield
+    finally:
+        estado_nos[chave] -= 1
+
+def ciclo_aeronave_visual(env: Any, id_aeronave: str, tipo: str, aeroporto: Any):
+    """
+    Simula o fluxo completo de uma aeronave no ambiente aeroportuário, englobando
+    desde a chegada até a decolagem e saída.
+    """
+    # Define os tempos de acordo com o tipo, com fallback seguro para 'G'
+    tempos = TEMPOS_PROCESSO.get(tipo, TEMPOS_PROCESSO['G'])
     
-    # --- POUSO (Segregado) ---
-    estado_nos[f'Fila Pouso ({tipo})'] += 1
+    # Seleção de pistas segregadas com base no tipo da aeronave
     pista = aeroporto.pistas_pequenas if tipo == 'P' else aeroporto.pista_grande
-    with pista.request() as req:
-        yield req
-        estado_nos[f'Fila Pouso ({tipo})'] -= 1
-        estado_nos[f'Pouso ({tipo})'] += 1
-        yield env.timeout(40 if tipo == 'P' else 60)
-        estado_nos[f'Pouso ({tipo})'] -= 1
 
-    # --- DESEMBARQUE (Compartilhado) ---
-    estado_nos['Fila Desemb'] += 1
-    with aeroporto.plataformas.request() as req:
-        yield req
-        estado_nos['Fila Desemb'] -= 1
-        estado_nos['Desembarque'] += 1
-        yield env.timeout(20 if tipo == 'P' else 40)
-        estado_nos['Desembarque'] -= 1
+    # --- 1. CHEGADA ---
+    with atualizar_estado('Chegada'):
+        yield env.timeout(1)
 
-    # --- HANGAR (Compartilhado) ---
-    estado_nos['Fila Hangar'] += 1
-    with aeroporto.hangares.request() as req:
-        yield req
-        estado_nos['Fila Hangar'] -= 1
-        estado_nos['Hangar'] += 1
-        yield env.timeout(35 if tipo == 'P' else 70)
-        estado_nos['Hangar'] -= 1
+    # --- 2. POUSO (Segregado) ---
+    with atualizar_estado(f'Fila Pouso ({tipo})'):
+        req_pouso = pista.request()
+        yield req_pouso
+        
+    with atualizar_estado(f'Pouso ({tipo})'):
+        yield env.timeout(tempos['pouso'])
+    pista.release(req_pouso)
 
-    # --- EMBARQUE (Compartilhado) ---
-    estado_nos['Fila Embarque'] += 1
-    with aeroporto.plataformas.request() as req:
-        yield req
-        estado_nos['Fila Embarque'] -= 1
-        estado_nos['Embarque'] += 1
-        yield env.timeout(30 if tipo == 'P' else 60)
-        estado_nos['Embarque'] -= 1
+    # --- 3. DESEMBARQUE (Compartilhado) ---
+    with atualizar_estado('Fila Desemb'):
+        req_desemb = aeroporto.plataformas.request()
+        yield req_desemb
+        
+    with atualizar_estado('Desembarque'):
+        yield env.timeout(tempos['desembarque'])
+    aeroporto.plataformas.release(req_desemb)
 
-    # --- DECOLAGEM (Segregado) ---
-    estado_nos[f'Fila Decolagem ({tipo})'] += 1
-    with pista.request() as req:
-        yield req
-        estado_nos[f'Fila Decolagem ({tipo})'] -= 1
-        estado_nos[f'Decolagem ({tipo})'] += 1
-        yield env.timeout(40 if tipo == 'P' else 60)
-        estado_nos[f'Decolagem ({tipo})'] -= 1
+    # --- 4. HANGAR (Compartilhado) ---
+    with atualizar_estado('Fila Hangar'):
+        req_hangar = aeroporto.hangares.request()
+        yield req_hangar
+        
+    with atualizar_estado('Hangar'):
+        yield env.timeout(tempos['hangar'])
+    aeroporto.hangares.release(req_hangar)
 
-    # --- SAÍDA ---
-    estado_nos['Saída'] += 1
+    # --- 5. EMBARQUE (Compartilhado) ---
+    with atualizar_estado('Fila Embarque'):
+        req_emb = aeroporto.plataformas.request()
+        yield req_emb
+        
+    with atualizar_estado('Embarque'):
+        yield env.timeout(tempos['embarque'])
+    aeroporto.plataformas.release(req_emb)
+
+    # --- 6. DECOLAGEM (Segregado) ---
+    with atualizar_estado(f'Fila Decolagem ({tipo})'):
+        req_decolagem = pista.request()
+        yield req_decolagem
+        
+    with atualizar_estado(f'Decolagem ({tipo})'):
+        yield env.timeout(tempos['decolagem'])
+    pista.release(req_decolagem)
+
+    # --- 7. SAÍDA ---
+    # Contabilização de nó absorvente (fim de simulação não requer timeout ou decremento).
+    estado_nos['Saída'] = estado_nos.get('Saída', 0) + 1
