@@ -7,6 +7,9 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from typing import List, Dict, Any
 
+import os
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -15,10 +18,10 @@ logging.basicConfig(
 
 try:
     from config import TOTAL_AERONAVES, estado_nos
-    from src import Aeroporto
-    from src import AeroportoVisual
-    from src import gerador_chegadas
-    from frontend import inicializar_grafo, renderizar_frame
+    from src.aeroporto import Aeroporto
+    from src.modelos import AeroportoVisual
+    from src.gerador import gerador_chegadas
+    from frontend.interface import inicializar_grafo, renderizar_frame
 except ImportError as e:
     logging.error(f"Falha ao importar módulos internos do projeto: {e}")
     sys.exit(1)

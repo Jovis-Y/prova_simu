@@ -2,7 +2,7 @@ import logging
 import pandas as pd
 from typing import Any, Generator
 
-from src import ciclo_aeronave_visual 
+from src.ciclo import ciclo_aeronave_visual 
 
 logger = logging.getLogger(__name__)
 
