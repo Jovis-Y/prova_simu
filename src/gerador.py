@@ -1,5 +1,5 @@
 import pandas as pd
-from aeronave import ciclo_aeronave
+from src.aeronave import ciclo_aeronave
 
 def gerador_chegadas(env, aeroporto, arquivo_csv, log_esperas):
     """ 
@@ -27,7 +27,7 @@ def gerador_chegadas(env, aeroporto, arquivo_csv, log_esperas):
         print("Crie um CSV com colunas: id, tipo, horario_chegada")
 
 import pandas as pd
-from modelos import ciclo_aeronave_visual
+from src.modelos import ciclo_aeronave_visual
 
 def gerador_chegadas(env, aeroporto, arquivo_csv):
     """
@@ -51,7 +51,7 @@ def gerador_chegadas(env, aeroporto, arquivo_csv):
         print(f"ERRO: Arquivo '{arquivo_csv}' não encontrado no diretório.")
 
 import pandas as pd
-from ciclo import ciclo_aeronave_visual
+from src.ciclo import ciclo_aeronave_visual
 
 def gerador_chegadas(env, aeroporto, arquivo_csv):
     try:

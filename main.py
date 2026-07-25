@@ -1,7 +1,7 @@
 import simpy
 import pandas as pd
-from aeroporto import Aeroporto
-from gerador import gerador_chegadas
+from src.aeroporto import Aeroporto
+from src.gerador import gerador_chegadas
 
 if __name__ == '__main__':
     print("Iniciando Simulação Discreta do Aeroporto...\n" + "="*50)
@@ -39,9 +39,9 @@ import matplotlib.animation as animation
 
 # Importações dos módulos locais separados
 from config import TOTAL_AERONAVES, estado_nos
-from modelos import AeroportoVisual
-from gerador import gerador_chegadas
-from visualizacao import inicializar_grafo, renderizar_frame
+from src.modelos import AeroportoVisual
+from src.gerador import gerador_chegadas
+from frontend.visualizacao import inicializar_grafo, renderizar_frame
 
 def main():
     # Inicializando gráficos

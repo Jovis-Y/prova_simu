@@ -1,4 +1,4 @@
-from topologia import estado_nos
+from src.topologia import estado_nos
 
 def ciclo_aeronave_visual(env, id_aeronave, tipo, aeroporto):
     # --- CHEGADA ---
