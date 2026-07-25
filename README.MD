@@ -2,9 +2,9 @@
 
 **Universidade Federal do Pará (UFPA)**  
 **Instituto de Ciências Exatas e Naturais (ICEN)** — **Faculdade de Computação**  
-**Disciplina:** Simulação Discreta 
-**Professor:** Dr. Filipe de Oliveira Saraiva  
-**Alunos:** João Vitor Yokoyama Nobayashi, Thiago Mendes de Castro Correia, 
+**Disciplina:** Simulação Discreta
+**Docente:** Dr. Prof. Filipe de Oliveira Saraiva.
+**Discentes:** João Vitor Yokoyama Nobayashi (202204940026), Thiago Mendes de Castro Correia (202304940014), Thiago Correa de Castro (202004940005).
 
 ---
 
