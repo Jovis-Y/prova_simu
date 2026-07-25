@@ -1,11 +1,6 @@
 from typing import Any
 from contextlib import contextmanager
-from topologia import estado_nos
-
-TEMPOS_PROCESSO = {
-    'P': {'pouso': 40, 'desembarque': 20, 'hangar': 35, 'embarque': 30, 'decolagem': 40},
-    'G': {'pouso': 60, 'desembarque': 40, 'hangar': 70, 'embarque': 60, 'decolagem': 60}
-}
+from config import TEMPOS_ATIVIDADES, estado_nos
 
 @contextmanager
 def atualizar_estado(chave: str):
@@ -16,7 +11,7 @@ def atualizar_estado(chave: str):
         estado_nos[chave] -= 1
 
 def ciclo_aeronave_visual(env: Any, id_aeronave: str, tipo: str, aeroporto: Any):
-    tempos = TEMPOS_PROCESSO.get(tipo, TEMPOS_PROCESSO['G'])
+    tempos = TEMPOS_ATIVIDADES.get(tipo, TEMPOS_ATIVIDADES['G'])
     
     pista = aeroporto.pistas_pequenas if tipo == 'P' else aeroporto.pista_grande
 

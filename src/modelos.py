@@ -1,50 +1,22 @@
 import simpy
-from typing import Dict, Any
-
-estado_nos: Dict[str, int] = {}
-
-class ConfiguracaoAeroporto:
-    CAPACIDADE_PISTA_PEQ = 4
-    CAPACIDADE_PISTA_GRA = 2
-    CAPACIDADE_PLATAFORMA = 5
-    CAPACIDADE_HANGAR = 3
-    CAPACIDADE_ABASTECIMENTO = 2
-
-    TEMPOS = {
-        'P': {
-            'pouso': 40, 
-            'desembarque': 20, 
-            'abastecimento': 15, 
-            'hangar': 35, 
-            'embarque': 30, 
-            'decolagem': 40
-        },
-        'G': {
-            'pouso': 60, 
-            'desembarque': 40, 
-            'abastecimento': 25, 
-            'hangar': 70, 
-            'embarque': 60, 
-            'decolagem': 60
-        }
-    }
+from config import CAPACIDADES, TEMPOS_ATIVIDADES, estado_nos
 
 class AeroportoVisual:
-    def __init__(self, env: simpy.Environment):
+    def __init__(self, env: simpy.Environment, capacidades=None):
         self.env = env
-        self.pistas_pequenas = simpy.Resource(env, capacity=ConfiguracaoAeroporto.CAPACIDADE_PISTA_PEQ)
-        self.pista_grande = simpy.Resource(env, capacity=ConfiguracaoAeroporto.CAPACIDADE_PISTA_GRA)
-        self.plataformas = simpy.Resource(env, capacity=ConfiguracaoAeroporto.CAPACIDADE_PLATAFORMA)
-        self.hangares = simpy.Resource(env, capacity=ConfiguracaoAeroporto.CAPACIDADE_HANGAR)
-        self.caminhoes_abastecimento = simpy.Resource(env, capacity=ConfiguracaoAeroporto.CAPACIDADE_ABASTECIMENTO)
+        _caps = capacidades if capacidades is not None else CAPACIDADES
+        
+        self.pistas_pequenas = simpy.Resource(env, capacity=_caps['pistas_pequenas'])
+        self.pista_grande = simpy.Resource(env, capacity=_caps['pista_grande'])
+        self.plataformas = simpy.Resource(env, capacity=_caps['plataformas'])
+        self.hangares = simpy.Resource(env, capacity=_caps['hangares'])
 
     @staticmethod
     def atualizar_estado(chave: str, delta: int) -> None:
         estado_nos[chave] = estado_nos.get(chave, 0) + delta
 
-
 def ciclo_aeronave_visual(env: simpy.Environment, id_aeronave: str, tipo: str, aeroporto: AeroportoVisual):
-    tempos = ConfiguracaoAeroporto.TEMPOS.get(tipo)
+    tempos = TEMPOS_ATIVIDADES.get(tipo)
     if not tempos:
         raise ValueError(f"Tipo de aeronave '{tipo}' não reconhecido.")
 
@@ -71,14 +43,6 @@ def ciclo_aeronave_visual(env: simpy.Environment, id_aeronave: str, tipo: str, a
         aeroporto.atualizar_estado('Desembarque', 1)
         yield env.timeout(tempos['desembarque'])
         aeroporto.atualizar_estado('Desembarque', -1)
-
-    aeroporto.atualizar_estado('Fila Abastecimento', 1)
-    with aeroporto.caminhoes_abastecimento.request() as req:
-        yield req
-        aeroporto.atualizar_estado('Fila Abastecimento', -1)
-        aeroporto.atualizar_estado('Abastecimento', 1)
-        yield env.timeout(tempos['abastecimento'])
-        aeroporto.atualizar_estado('Abastecimento', -1)
 
     aeroporto.atualizar_estado('Fila Hangar', 1)
     with aeroporto.hangares.request() as req:

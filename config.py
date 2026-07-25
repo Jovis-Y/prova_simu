@@ -67,27 +67,3 @@ ARESTAS: List[Tuple[str, str]] = [
 ]
 
 estado_nos: Dict[str, int] = {no: 0 for no in POSICOES.keys()}
-
-class AeroportoVisual:
-    
-    def __init__(self, env: simpy.Environment, capacidades: Dict[str, int] = None):
-        self.env = env
-        
-        _caps = capacidades if capacidades is not None else CAPACIDADES
-        
-        self.pistas_pequenas = simpy.Resource(env, capacity=_caps['pistas_pequenas'])
-        self.pista_grande = simpy.Resource(env, capacity=_caps['pista_grande'])
-        self.plataformas = simpy.Resource(env, capacity=_caps['plataformas'])
-        self.hangares = simpy.Resource(env, capacity=_caps['hangares'])
-
-    @staticmethod
-    def obter_tempo_atividade(porte: str, atividade: str) -> int:
-        return TEMPOS_ATIVIDADES.get(porte, {}).get(atividade, 0)
-
-    @staticmethod
-    def atualizar_estado_no(no_origem: str, no_destino: str) -> None:
-        if no_origem in estado_nos and estado_nos[no_origem] > 0:
-            estado_nos[no_origem] -= 1
-            
-        if no_destino in estado_nos:
-            estado_nos[no_destino] += 1
