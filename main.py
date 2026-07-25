@@ -1,100 +1,153 @@
+import argparse
+import logging
+import sys
 import simpy
 import pandas as pd
-from src.aeroporto import Aeroporto
-from src.gerador import gerador_chegadas
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from typing import List, Dict, Any
 
-if __name__ == '__main__':
-    print("Iniciando Simulação Discreta do Aeroporto...\n" + "="*50)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+try:
+    from config import TOTAL_AERONAVES, estado_nos
+    from src import Aeroporto
+    from src import AeroportoVisual
+    from src import gerador_chegadas
+    from frontend import inicializar_grafo, renderizar_frame
+except ImportError as e:
+    logging.error(f"Falha ao importar módulos internos do projeto: {e}")
+    sys.exit(1)
+
+
+def executar_modo_texto(arquivo_chegadas: str = 'chegadas.csv') -> None:
+    logging.info(f"{'='*50}\nIniciando Simulação Discreta do Aeroporto (Modo Métricas)...\n{'='*50}")
     
-    # Lista para armazenar métricas; agora local, enviada por referência para não ser global
-    log_esperas = []
-    
-    # Cria o ambiente de simulação e a instância do aeroporto
+    log_esperas: List[Dict[str, Any]] = []
     env = simpy.Environment()
     aeroporto = Aeroporto(env)
     
-    # Inicia o processo do gerador lendo o arquivo especificado
-    env.process(gerador_chegadas(env, aeroporto, 'chegadas.csv', log_esperas))
+    env.process(gerador_chegadas(env, aeroporto, arquivo_chegadas, log_esperas))
     
-    # Executa até a exaustão de todos os eventos programados no ambiente
     env.run()
     
-    print("="*50 + f"\nTempo final da simulação: {env.now:.1f} minutos\n")
+    logging.info(f"{'='*50}\nTempo final da simulação: {env.now:.1f} minutos\n{'='*50}")
     
-    # Transforma o log num DataFrame Pandas para facilitar a análise de gargalos
     df_metricas = pd.DataFrame(log_esperas)
-    if not df_metricas.empty:
-        print("MÉDIA DE TEMPO DE ESPERA POR FILA (em minutos):")
-        
-        # Agrupa pelo 'Tipo' da aeronave e calcula a média das colunas de espera
-        medias_por_tipo = df_metricas.groupby('Tipo')[
-            ['Espera_Pouso', 'Espera_Desemb', 'Espera_Hangar', 'Espera_Embarque', 'Espera_Decolagem']
-        ].mean()
-        
-        print(medias_por_tipo)
+    if df_metricas.empty:
+        logging.warning("Nenhum dado foi registrado durante a simulação.")
+        return
 
-import simpy
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-
-# Importações dos módulos locais separados
-from config import TOTAL_AERONAVES, estado_nos
-from src.modelos import AeroportoVisual
-from src.gerador import gerador_chegadas
-from frontend.visualizacao import inicializar_grafo, renderizar_frame
-
-def main():
-    # Inicializando gráficos
-    fig, ax = plt.subplots(figsize=(15, 7))
+    logging.info("Calculando gargalos e médias de tempo de espera...")
     
-    # Inicializando ambiente SimPy
+    colunas_espera = [
+        'Espera_Pouso', 'Espera_Desemb', 'Espera_Hangar', 
+        'Espera_Embarque', 'Espera_Decolagem'
+    ]
+    
+    colunas_presentes = [col for col in colunas_espera if col in df_metricas.columns]
+    
+    if colunas_presentes:
+        medias_por_tipo = df_metricas.groupby('Tipo')[colunas_presentes].mean()
+        
+        print("\n--- MÉDIA DE TEMPO DE ESPERA POR FILA (em minutos) ---")
+        print(medias_por_tipo.to_string())
+    else:
+        logging.warning("As colunas de espera esperadas não foram encontradas no log.")
+
+
+def executar_modo_visual(arquivo_chegadas: str = 'chegadas.csv', arquivo_saida: str = 'simulacao_aeroporto.mp4') -> None:
+    logging.info("Inicializando ambiente visual da simulação...")
+    
+    fig, ax = plt.subplots(figsize=(15, 7))
     env = simpy.Environment()
     aeroporto = AeroportoVisual(env)
     
-    # Iniciando o processo gerador
-    env.process(gerador_chegadas(env, aeroporto, 'chegadas.csv'))
+    env.process(gerador_chegadas(env, aeroporto, arquivo_chegadas))
     
-    # Obtendo a topologia visual do Grafo
-    G = inicializar_grafo()
-    
-    def atualizar_frame(frame):
+    try:
+        G = inicializar_grafo()
+    except Exception as e:
+        logging.error(f"Erro ao inicializar topologia visual do grafo: {e}")
+        return
+
+    def atualizar_frame(frame: int):
         ax.clear()
         
-        if estado_nos['Saída'] >= TOTAL_AERONAVES:
+        if estado_nos.get('Saída', 0) >= TOTAL_AERONAVES:
             ax.text(0.5, 0.95, "SIMULAÇÃO CONCLUÍDA!", 
                     transform=ax.transAxes, ha='center', 
                     fontsize=14, color='red', weight='bold')
         else:
-            # Avança a simulação em passos de 10 min por frame
             env.run(until=env.now + 10)
         
-        # Chama módulo de renderização visual
         renderizar_frame(ax, G)
         ax.set_title(f"ACD Aeroporto (Foco Pistas) - Tempo Simulado: {env.now} min")
 
     def gerador_frames():
-        """ Gera frames apenas enquanto a simulação não acabar """
         frame = 0
-        while estado_nos['Saída'] < TOTAL_AERONAVES:
+        while estado_nos.get('Saída', 0) < TOTAL_AERONAVES:
             yield frame
             frame += 1
-        yield frame # Frame extra de conclusão
-        
+        yield frame
+
+    logging.info("Processando a simulação e gerando o vídeo... Este processo pode levar alguns minutos.")
+    
     ani = animation.FuncAnimation(
         fig, atualizar_frame, frames=gerador_frames, 
         interval=100, cache_frame_data=False, save_count=2000
     )
     
     plt.tight_layout()
-    print("Processando a simulação e gerando o vídeo... Aguarde.")
     
-    # Salvando a simulação (Certifique-se de ter o FFmpeg instalado)
     try:
-        ani.save('simulacao_2_pista_P_e_1_pista_G_a_mais.mp4', writer='ffmpeg', fps=10)
-        print("Vídeo salvo com sucesso!")
+        ani.save(arquivo_saida, writer='ffmpeg', fps=10)
+        logging.info(f"Vídeo salvo com sucesso: {arquivo_saida}")
     except Exception as e:
-        print(f"Erro ao salvar vídeo: {e}")
-        # plt.show() # Descomente se preferir ver a janela ao invés de salvar
+        logging.error(f"Erro crítico ao salvar o vídeo (Verifique se o FFmpeg está instalado): {e}")
+        logging.info("Exibindo interface gráfica como alternativa fallback.")
+        plt.show()
 
-if __name__ == "__main__":
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Simulador de Tráfego Aeroportuário (Eventos Discretos)",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    
+    parser.add_argument(
+        '--modo', 
+        type=str, 
+        choices=['texto', 'visual'], 
+        default='texto',
+        help="Define o modo de execução da simulação: 'texto' para gerar métricas e 'visual' para gerar vídeo."
+    )
+    
+    parser.add_argument(
+        '--arquivo', 
+        type=str, 
+        default='chegadas.csv',
+        help="Caminho para o arquivo CSV com a agenda de chegadas."
+    )
+    
+    parser.add_argument(
+        '--saida', 
+        type=str, 
+        default='simulacao_2_pista_P_e_1_pista_G_a_mais.mp4',
+        help="Nome do arquivo de vídeo de saída (aplicável apenas no modo visual)."
+    )
+
+    args = parser.parse_args()
+
+    if args.modo == 'texto':
+        executar_modo_texto(arquivo_chegadas=args.arquivo)
+    elif args.modo == 'visual':
+        executar_modo_visual(arquivo_chegadas=args.arquivo, arquivo_saida=args.saida)
+
+
+if __name__ == '__main__':
     main()
