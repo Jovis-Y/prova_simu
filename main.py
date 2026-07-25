@@ -1,156 +1,100 @@
 import simpy
 import pandas as pd
+from aeroporto import Aeroporto
+from gerador import gerador_chegadas
 
-# ==========================================
-# 1. CONSTANTES E CONFIGURAÇÕES
-# ==========================================
-# Tempos (em minutos) baseados na descrição do problema
-TEMPOS_ATIVIDADES = {
-    'P': {'pouso': 40, 'desembarque': 20, 'hangar': 35, 'embarque': 30, 'decolagem': 40},
-    'G': {'pouso': 60, 'desembarque': 40, 'hangar': 70, 'embarque': 60, 'decolagem': 60}
-}
-
-# Lista para armazenar métricas e ajudar na identificação de gargalos
-log_esperas = []
-
-# ==========================================
-# 2. ABSTRAÇÃO DO AMBIENTE (RECURSOS)
-# ==========================================
-class Aeroporto:
-    """Encapsula todos os recursos físicos do aeroporto."""
-    def __init__(self, env):
-        self.env = env
-        # Capacidades definidas no problema
-        self.pistas_pequenas = simpy.Resource(env, capacity=2)
-        self.pista_grande = simpy.Resource(env, capacity=1)
-        self.plataformas = simpy.Resource(env, capacity=5)
-        self.hangares = simpy.Resource(env, capacity=4)
-
-# ==========================================
-# 3. PROCESSO DA ENTIDADE (CICLO DA AERONAVE)
-# ==========================================
-def ciclo_aeronave(env, id_aeronave, tipo, aeroporto):
-    """ Modela o fluxo de vida (ACD) de uma aeronave no sistema. """
-    tempos = TEMPOS_ATIVIDADES[tipo]
-    
-    # Define qual pista será usada com base no porte da aeronave
-    pista_adequada = aeroporto.pistas_pequenas if tipo == 'P' else aeroporto.pista_grande
-    
-    # ----------------------------------
-    # FASE 1: POUSO
-    # ----------------------------------
-    chegada_fila_pouso = env.now
-    with pista_adequada.request() as req:
-        yield req  # Aguarda na fila até a pista liberar
-        espera_pouso = env.now - chegada_fila_pouso
-        print(f"[{env.now:06.1f}] Voo {id_aeronave} ({tipo}) inicia POUSO. (Espera: {espera_pouso} min)")
-        yield env.timeout(tempos['pouso']) # Executa a atividade
-    
-    # ----------------------------------
-    # FASE 2: DESEMBARQUE
-    # ----------------------------------
-    chegada_fila_desemb = env.now
-    with aeroporto.plataformas.request() as req:
-        yield req
-        espera_desemb = env.now - chegada_fila_desemb
-        print(f"[{env.now:06.1f}] Voo {id_aeronave} ({tipo}) inicia DESEMBARQUE.")
-        yield env.timeout(tempos['desembarque'])
-        
-    # ----------------------------------
-    # FASE 3: HANGAR
-    # ----------------------------------
-    chegada_fila_hangar = env.now
-    with aeroporto.hangares.request() as req:
-        yield req
-        espera_hangar = env.now - chegada_fila_hangar
-        print(f"[{env.now:06.1f}] Voo {id_aeronave} ({tipo}) entra no HANGAR.")
-        yield env.timeout(tempos['hangar'])
-
-    # ----------------------------------
-    # FASE 4: EMBARQUE
-    # ----------------------------------
-    chegada_fila_embarque = env.now
-    with aeroporto.plataformas.request() as req:
-        yield req
-        espera_embarque = env.now - chegada_fila_embarque
-        print(f"[{env.now:06.1f}] Voo {id_aeronave} ({tipo}) inicia EMBARQUE.")
-        yield env.timeout(tempos['embarque'])
-
-    # ----------------------------------
-    # FASE 5: DECOLAGEM
-    # ----------------------------------
-    chegada_fila_decolagem = env.now
-    with pista_adequada.request() as req:
-        yield req
-        espera_decolagem = env.now - chegada_fila_decolagem
-        print(f"[{env.now:06.1f}] Voo {id_aeronave} ({tipo}) inicia DECOLAGEM.")
-        yield env.timeout(tempos['decolagem'])
-
-    print(f"[{env.now:06.1f}] ---> Voo {id_aeronave} ({tipo}) FINALIZOU e deixou o sistema.")
-    
-    # Registra as métricas dessa aeronave para análise de gargalos
-    log_esperas.append({
-        'ID': id_aeronave,
-        'Tipo': tipo,
-        'Espera_Pouso': espera_pouso,
-        'Espera_Desemb': espera_desemb,
-        'Espera_Hangar': espera_hangar,
-        'Espera_Embarque': espera_embarque,
-        'Espera_Decolagem': espera_decolagem
-    })
-
-# ==========================================
-# 4. GERADOR DE CHEGADAS (INPUT DE DADOS)
-# ==========================================
-def gerador_chegadas(env, aeroporto, arquivo_csv):
-    """ Lê o CSV e gera as aeronaves nos momentos corretos da simulação. """
-    try:
-        # Espera-se que o CSV tenha cabeçalhos como: ID, Tipo, Chegada
-        df = pd.read_csv(arquivo_csv, delimiter=',') # Ajuste o delimiter (',', ';') se necessário
-        
-        
-        for _, row in df.iterrows():
-            id_aeronave = row['id']
-            tipo = str(row['tipo']).strip().upper()
-            tempo_chegada = float(row['horario_chegada'])
-            
-            # Trava o processo gerador até o tempo exato de chegada dessa aeronave
-            if tempo_chegada > env.now:
-                yield env.timeout(tempo_chegada - env.now)
-            
-            # Inicia o processo de fluxo da aeronave independentemente do gerador
-            env.process(ciclo_aeronave(env, id_aeronave, tipo, aeroporto))
-            
-    except FileNotFoundError:
-        print(f"ERRO: Arquivo '{arquivo_csv}' não encontrado no diretório.")
-        print("Crie um CSV com colunas: ID, Tipo, Chegada")
-
-# ==========================================
-# 5. EXECUÇÃO PRINCIPAL
-# ==========================================
 if __name__ == '__main__':
     print("Iniciando Simulação Discreta do Aeroporto...\n" + "="*50)
     
-    # Cria o ambiente e o aeroporto
+    # Lista para armazenar métricas; agora local, enviada por referência para não ser global
+    log_esperas = []
+    
+    # Cria o ambiente de simulação e a instância do aeroporto
     env = simpy.Environment()
     aeroporto = Aeroporto(env)
     
-    # Inicia o processo do gerador lendo o arquivo especificado na prova
-    env.process(gerador_chegadas(env, aeroporto, 'chegadas.csv'))
+    # Inicia o processo do gerador lendo o arquivo especificado
+    env.process(gerador_chegadas(env, aeroporto, 'chegadas.csv', log_esperas))
     
-    # Executa até a exaustão de todos os eventos
+    # Executa até a exaustão de todos os eventos programados no ambiente
     env.run()
     
     print("="*50 + f"\nTempo final da simulação: {env.now:.1f} minutos\n")
     
-    # Transforma o log num DataFrame
+    # Transforma o log num DataFrame Pandas para facilitar a análise de gargalos
     df_metricas = pd.DataFrame(log_esperas)
     if not df_metricas.empty:
         print("MÉDIA DE TEMPO DE ESPERA POR FILA (em minutos):")
         
-        # Agrupa pelo 'Tipo' e calcula a média das colunas selecionadas
+        # Agrupa pelo 'Tipo' da aeronave e calcula a média das colunas de espera
         medias_por_tipo = df_metricas.groupby('Tipo')[
             ['Espera_Pouso', 'Espera_Desemb', 'Espera_Hangar', 'Espera_Embarque', 'Espera_Decolagem']
         ].mean()
         
         print(medias_por_tipo)
+
+import simpy
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+
+# Importações dos módulos locais separados
+from config import TOTAL_AERONAVES, estado_nos
+from modelos import AeroportoVisual
+from gerador import gerador_chegadas
+from visualizacao import inicializar_grafo, renderizar_frame
+
+def main():
+    # Inicializando gráficos
+    fig, ax = plt.subplots(figsize=(15, 7))
+    
+    # Inicializando ambiente SimPy
+    env = simpy.Environment()
+    aeroporto = AeroportoVisual(env)
+    
+    # Iniciando o processo gerador
+    env.process(gerador_chegadas(env, aeroporto, 'chegadas.csv'))
+    
+    # Obtendo a topologia visual do Grafo
+    G = inicializar_grafo()
+    
+    def atualizar_frame(frame):
+        ax.clear()
+        
+        if estado_nos['Saída'] >= TOTAL_AERONAVES:
+            ax.text(0.5, 0.95, "SIMULAÇÃO CONCLUÍDA!", 
+                    transform=ax.transAxes, ha='center', 
+                    fontsize=14, color='red', weight='bold')
+        else:
+            # Avança a simulação em passos de 10 min por frame
+            env.run(until=env.now + 10)
+        
+        # Chama módulo de renderização visual
+        renderizar_frame(ax, G)
+        ax.set_title(f"ACD Aeroporto (Foco Pistas) - Tempo Simulado: {env.now} min")
+
+    def gerador_frames():
+        """ Gera frames apenas enquanto a simulação não acabar """
+        frame = 0
+        while estado_nos['Saída'] < TOTAL_AERONAVES:
+            yield frame
+            frame += 1
+        yield frame # Frame extra de conclusão
+        
+    ani = animation.FuncAnimation(
+        fig, atualizar_frame, frames=gerador_frames, 
+        interval=100, cache_frame_data=False, save_count=2000
+    )
+    
+    plt.tight_layout()
+    print("Processando a simulação e gerando o vídeo... Aguarde.")
+    
+    # Salvando a simulação (Certifique-se de ter o FFmpeg instalado)
+    try:
+        ani.save('simulacao_2_pista_P_e_1_pista_G_a_mais.mp4', writer='ffmpeg', fps=10)
+        print("Vídeo salvo com sucesso!")
+    except Exception as e:
+        print(f"Erro ao salvar vídeo: {e}")
+        # plt.show() # Descomente se preferir ver a janela ao invés de salvar
+
+if __name__ == "__main__":
+    main()
