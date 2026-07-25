@@ -21,7 +21,11 @@
 
 ## 1. Modelagem ACD (Activity Cycle Diagram)
 
+<div align="center">
+
 ![Diagrama ACD do Cenário Aeroportuário](/output/modelagem_acd-1.png)
+
+</div>
 
 ### Tempos Operacionais:
 | Operação | Pequeno Porte (P) | Grande Porte (G) |
@@ -38,8 +42,11 @@
 
 Ao realizar a execução da simulação para o cenário padrão, identificamos gargarlo no pouso e decolagem
 
+<div align="center">
+
 ![resultado da simulação](/output/resultado_simulação_padrão.png)
 
+</div>
 
 portanto, criamos os seguintes cenários para otimizar o fluxo
 
