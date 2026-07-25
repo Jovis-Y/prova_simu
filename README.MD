@@ -10,7 +10,7 @@
 
 ## Sumário
 1. [Modelagem ACD ](#1-modelagem-acd-activity-cycle-diagram)
-2. [Análise dos Cenários e Resultados das Simulações](#2-análise-dos-cenários-e-resultados-das-simulações)
+2. [Análise dos Cenários e Resultados das Simulações](#2-identificação-dos-gargalos-do-sistema-e-criação-de-cenários-que-reduzam-os-gargalos)
 3. [Análise Econômica e de Viabilidade das Soluções](#3-análise-econômica-e-de-viabilidade-das-soluções)
 
 ---
@@ -21,7 +21,7 @@
 
 ## 1. Modelagem ACD (Activity Cycle Diagram)
 
-![Diagrama ACD do Cenário Aeroportuário](modelagem_acd-1.png)
+![Diagrama ACD do Cenário Aeroportuário](/output/modelagem_acd-1.png)
 
 ### Tempos Operacionais:
 | Operação | Pequeno Porte (P) | Grande Porte (G) |
@@ -38,7 +38,7 @@
 
 Ao realizar a execução da simulação para o cenário padrão, identificamos gargarlo no pouso e decolagem
 
-![resultado da simulação](resultado_simulação_padrão.png)
+![resultado da simulação](/output/resultado_simulação_padrão.png)
 
 
 portanto, criamos os seguintes cenários para otimizar o fluxo
